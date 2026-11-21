@@ -154,6 +154,7 @@ The two share their axes: `x` across, `y` from the head rail to the foot rail.
 pnpm install
 pnpm check    # tests, types, lint, formatting
 pnpm build    # dist/, what the package ships
+pnpm bench    # how long a break, a shot and the playback take
 ```
 
 The source is `src/table.ts` (the table as data) and `src/physics.ts` (everything that moves). `src/testing.ts` is the tests' table and rack, and isn't part of the package.
