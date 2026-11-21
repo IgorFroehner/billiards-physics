@@ -8,6 +8,7 @@ import {
   evolve as evolveOn,
   fromKeyframe,
   keyMotion,
+  restingBall as ball,
   keyTime,
   run as runOn,
   sample as sampleOn,
@@ -36,10 +37,6 @@ const simulate = (balls: readonly Ball[], vx: number, vy: number, spin?: Spin, o
 const run = (balls: readonly Ball[], options?: RunOptions) => runOn(T, balls, options)
 const evolve = (b: Ball, dt: number) => evolveOn(T, b, dt)
 const sample = (track: Track, t: number) => sampleOn(T, track, t)
-
-function ball(id: number, x: number, y: number): Ball {
-  return { id, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, motion: "still", pocket: null }
-}
 
 /** A table with only these balls on it, the rest already pocketed, each at its id's index. */
 function table(...on: Ball[]): Ball[] {
@@ -433,7 +430,7 @@ describe("a run without a cue", () => {
     expect(withMotion(T, rolling(1, 0.4, 0.3, 1)).motion).toBe("rolling")
   })
 
-  it("tells a ball out of its place from a missing cue ball", () => {
+  it("tells a ball out of its place from a missing cue ball, and from a table its cushions can't play on", () => {
     const code = (go: () => unknown) => {
       try {
         go()
@@ -446,6 +443,10 @@ describe("a run without a cue", () => {
     expect(code(() => simulate([{ ...ball(0, 0, 0), motion: "pocketed" }], 0, 1))).toBe("no_cue_ball")
     expect(code(() => simulate([], 0, 1))).toBe("no_cue_ball")
     expect(code(() => run([]))).toBeNull()
+    const low = { ...T, cushionHeight: -0.001 }
+    const high = { ...T, cushionHeight: 2 * R + 0.001 }
+    expect(code(() => runOn(low, [ball(0, 0.3, 0.3)]))).toBe("bad_table")
+    expect(code(() => simulateOn(high, [ball(0, 0.3, 0.3)], 0, 1))).toBe("bad_table")
   })
 
   it("stops at the event limit, and says it didn't settle", () => {
