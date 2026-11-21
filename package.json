@@ -1,0 +1,52 @@
+{
+  "name": "billiards-physics",
+  "version": "0.1.0",
+  "description": "Event-based cue-sports physics in TypeScript: a table as data, and a shot run on it one event at a time. No dependencies.",
+  "keywords": [
+    "billiards",
+    "pool",
+    "snooker",
+    "cue-sports",
+    "physics",
+    "simulation",
+    "event-based",
+    "deterministic",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IgorFroehner/billiards-physics.git"
+  },
+  "homepage": "https://github.com/IgorFroehner/billiards-physics#readme",
+  "bugs": "https://github.com/IgorFroehner/billiards-physics/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "lint": "oxlint src",
+    "format": "prettier --write .",
+    "check": "vitest run && tsc -p . && oxlint src && prettier --check .",
+    "prepublishOnly": "pnpm check && pnpm build"
+  },
+  "devDependencies": {
+    "oxlint": "1.89.0",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

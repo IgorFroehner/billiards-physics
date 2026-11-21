@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      - name: The built package runs in plain Node
+        run: node --input-type=module -e "import('./dist/index.js').then((m) => { const out = m.simulate(m.poolTable(9), [m.restingBall(0, 0.6, 0.6), m.restingBall(1, 0.6, 1.5)], 0, 2); if (out.firstHit !== 1 || !out.settled) throw new Error('the built package gave a wrong shot') })"

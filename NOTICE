@@ -1,0 +1,8 @@
+billiards-physics
+Copyright 2026 The billiards-physics authors
+
+This library is a new implementation, in TypeScript, of the motion models of
+pooltool (https://github.com/ekiefl/pooltool) by Evan Kiefl, which is licensed
+under the Apache License, Version 2.0. Parts of it follow pooltool's
+implementation of those models closely, and its default cloth, cushion and ball
+numbers are pooltool's.
