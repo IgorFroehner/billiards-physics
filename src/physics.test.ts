@@ -411,6 +411,11 @@ describe("a run without a cue", () => {
     const cut = simulate(balls, 0, HARDEST, undefined, { maxEvents: 40 })
     expect(cut.settled).toBe(false)
     expect(cut.balls.every((b) => b.motion === "still" || b.motion === "pocketed")).toBe(true)
+    // The track stops them where the run did.
+    sample(cut.track, cut.track.duration + 1).forEach((b, i) => {
+      const real = cut.balls[i] as Ball
+      expect(Math.hypot(b.x - real.x, b.y - real.y)).toBeLessThan(1e-9)
+    })
     const whole = simulate(balls, 0, HARDEST)
     expect(whole.settled).toBe(true)
     expect(whole.track.duration).toBeGreaterThan(cut.track.duration)
