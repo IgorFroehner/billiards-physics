@@ -20,9 +20,17 @@ sample(table, shot.track, 0.5) // every ball half a second in, to draw it
 compact(shot.track) // the track rounded, to send over a network
 ```
 
+## Install
+
+```sh
+npm install billiards-physics
+```
+
+It ships as ES modules with their type declarations, built to ES2022, and has no dependencies.
+
 ## Status
 
-Not on npm yet. Until 1.0 the API can still change.
+Until 1.0 the API can still change.
 
 ## What it models
 
