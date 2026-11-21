@@ -345,6 +345,48 @@ describe("the break and the shots after it", () => {
     const balls = rackedBalls(T, seeded(5))
     expect(simulate(balls, 0.01, 6)).toEqual(simulate(balls, 0.01, 6))
   })
+
+  // Every number of one break, to the last digit: a change meant only to tidy or speed up the code keeps them all, and
+  // one that changes the physics, however little, shows here. This break has a bit of everything: balls, cushions,
+  // jaws, a pocket, and all five motions. When a change is meant to move the numbers, `pnpm vitest run -u` writes the
+  // new ones.
+  it("keeps its numbers from one version to the next", () => {
+    const out = simulate(rackedBalls(T, seeded(8)), 0.02, HARDEST, { side: 0.2, top: 0.3 })
+    expect({
+      duration: out.track.duration,
+      events: out.events.length,
+      keyframes: out.track.keys.flat().length,
+      pocketed: out.pocketed,
+      balls: out.balls.map((b) => (b.motion === "pocketed" ? `pocket ${b.pocket}` : `${b.x}, ${b.y}`)),
+    }).toMatchInlineSnapshot(`
+      {
+        "balls": [
+          "0.9566105679093984, 1.9027356491926892",
+          "pocket 0",
+          "0.4535403910956192, 1.5445033534343886",
+          "0.6166988876876022, 1.5318735816625184",
+          "0.4051604440800245, 1.600726049983022",
+          "0.4960425067546812, 1.5880017510176794",
+          "0.7292775097959668, 1.5500540503316813",
+          "0.365294762333204, 1.6577775023446575",
+          "0.470034625837863, 1.6422589455206311",
+          "0.5524391058773234, 1.6837399933768737",
+          "0.8491255613768958, 1.8864422514352817",
+          "0.22118805776945677, 0.850940881232801",
+          "0.34629621734917476, 1.7385413696322056",
+          "0.4273785996671558, 1.9171191869363906",
+          "0.562802729507917, 1.7897579721147998",
+          "0.9113929627421442, 0.7296321706553247",
+        ],
+        "duration": 7.162998268051877,
+        "events": 44,
+        "keyframes": 138,
+        "pocketed": [
+          1,
+        ],
+      }
+    `)
+  })
 })
 
 describe("a run without a cue", () => {
