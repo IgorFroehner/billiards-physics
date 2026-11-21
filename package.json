@@ -1,6 +1,6 @@
 {
   "name": "billiards-physics",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Event-based cue-sports physics in TypeScript: a table as data, and a shot run on it one event at a time. No dependencies.",
   "keywords": [
     "billiards",
