@@ -93,7 +93,7 @@ The balls and cloth default to pool's (`poolBallsAndCloth()`), with pooltool's n
 | `bounce(table, ball, nx, ny)` | a ball right after it comes off a cushion whose normal is (nx, ny) |
 | `withMotion(table, ball)` | a hand-made ball with the motion its velocity and spin say |
 
-`run` and `simulate` give back the `balls` at the end, the `track`, the `events`, the `pocketed` balls in order and `settled`. A run that goes past `maxEvents` (an option, 20,000 by default) stops where it is with `settled: false`. A mistake in the call throws a `BilliardsError` whose `code` says which: `no_cue_ball` or `ball_order`.
+`run` and `simulate` give back the `balls` at the end, the `track`, the `events`, the `pocketed` balls in order and `settled`. A run that goes past `maxEvents` (an option, 20,000 by default) stops where it is with `settled: false`. A mistake in the call throws a `BilliardsError` whose `code` says which: `no_cue_ball`, `ball_order`, or `bad_table` (a `cushionHeight` the balls can't reach).
 
 ## The track
 

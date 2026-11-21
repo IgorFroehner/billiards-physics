@@ -37,8 +37,9 @@ export class BilliardsError extends Error {
   /**
    * - `no_cue_ball`: `simulate` strikes ball 0, and it's missing or pocketed.
    * - `ball_order`: a ball isn't at its id's index in the list.
+   * - `bad_table`: the table's cushions can't touch its balls: `cushionHeight` isn't from 0 to the ball's height.
    */
-  readonly code: "no_cue_ball" | "ball_order"
+  readonly code: "no_cue_ball" | "ball_order" | "bad_table"
 
   constructor(code: BilliardsError["code"], message: string) {
     super(message)
@@ -731,6 +732,10 @@ export function run(table: TableSpec, start: readonly Ball[], options: RunOption
   const R = table.ballRadius
   const maxEvents = options.maxEvents ?? MAX_EVENTS
   const outs = outLines(table)
+  // Past the ball's top or under the cloth, the cushion's nose would miss the ball, and a bounce would be NaN.
+  if (!(table.cushionHeight >= 0 && table.cushionHeight <= 2 * R)) {
+    throw new BilliardsError("bad_table", `cushionHeight ${table.cushionHeight} isn't from 0 to the ball's height`)
+  }
   start.forEach((b, i) => {
     if (b.id !== i) throw new BilliardsError("ball_order", `ball ${b.id} is at index ${i}, not at its id's`)
   })
@@ -784,7 +789,7 @@ export function run(table: TableSpec, start: readonly Ball[], options: RunOption
       pocketed.push(e.ball)
       changed.push(e.ball)
     }
-    for (const id of changed) keys[id]?.push(toKeyframe(time, balls[id] as Ball))
+    for (const id of changed) (keys[id] as Keyframe[]).push(toKeyframe(time, balls[id] as Ball))
   }
 
   const settled = !balls.some(moving)
@@ -794,7 +799,7 @@ export function run(table: TableSpec, start: readonly Ball[], options: RunOption
   balls = balls.map((b, id) => {
     if (!moving(b) && b.motion !== "spinning") return b
     const stopped: Ball = { ...b, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, motion: "still" }
-    if (moving(b)) keys[id]?.push(toKeyframe(time, stopped))
+    if (moving(b)) (keys[id] as Keyframe[]).push(toKeyframe(time, stopped))
     return stopped
   })
   const contacts = events.map((e): Contact => [e.t, e.type, e.speed])
