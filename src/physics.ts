@@ -229,7 +229,8 @@ function degree(c: Poly): number {
 function turns(c: Poly, lo: number, hi: number): number[] {
   const d = degree(c)
   if (d <= 1) return []
-  const slope = c.slice(1, d + 1).map((v, i) => v * (i + 1))
+  const slope: Poly = []
+  for (let i = 1; i <= d; i++) slope.push((c[i] as number) * i)
   return roots(slope, lo, hi)
 }
 
@@ -241,29 +242,31 @@ function roots(c: Poly, lo: number, hi: number): number[] {
     const r = -(c[0] as number) / (c[1] as number)
     return r > lo && r < hi ? [r] : []
   }
-  const points = [lo, ...turns(c, lo, hi), hi]
+  const between = turns(c, lo, hi)
   const out: number[] = []
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i] as number
-    const b = points[i + 1] as number
-    const fa = at(c, a)
+  let a = lo
+  let fa = at(c, a)
+  for (let i = 0; i <= between.length; i++) {
+    const b = i < between.length ? (between[i] as number) : hi
     const fb = at(c, b)
-    if (fa > 0 && fb < 0) out.push(cross(c, a, b))
-    else if (fa < 0 && fb > 0) {
-      const flipped = c.map((v) => -v)
-      out.push(cross(flipped, a, b))
-    }
+    if (fa > 0 && fb < 0) out.push(cross(c, a, b, 1))
+    else if (fa < 0 && fb > 0) out.push(cross(c, a, b, -1))
+    a = b
+    fa = fb
   }
   return out
 }
 
-/** Where `c` goes from above zero (at `a`) to zero or below (at `b`). Returns the first time at or below zero. */
-function cross(c: Poly, a: number, b: number): number {
+/**
+ * Where `sign · c` goes from above zero (at `a`) to zero or below (at `b`). Returns the first time at or below zero.
+ * With `sign` -1, it's where `c` comes up from below.
+ */
+function cross(c: Poly, a: number, b: number, sign: 1 | -1): number {
   let lo = a
   let hi = b
   for (let i = 0; i < 80 && hi - lo > 1e-13; i++) {
     const mid = (lo + hi) / 2
-    if (at(c, mid) > 0) lo = mid
+    if (sign * at(c, mid) > 0) lo = mid
     else hi = mid
   }
   return hi
@@ -275,15 +278,17 @@ function cross(c: Poly, a: number, b: number): number {
  * back into the other before they ever came apart.
  */
 function firstTouch(c: Poly, hi: number): number | null {
-  const points = [0, ...turns(c, 0, hi), hi]
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i] as number
-    const b = points[i + 1] as number
-    const fa = at(c, a)
+  const between = turns(c, 0, hi)
+  let a = 0
+  let fa = at(c, a)
+  for (let i = 0; i <= between.length; i++) {
+    const b = i < between.length ? (between[i] as number) : hi
     const fb = at(c, b)
     if (fa <= 0) {
       if (fb < fa) return a
-    } else if (fb <= 0) return cross(c, a, b)
+    } else if (fb <= 0) return cross(c, a, b, 1)
+    a = b
+    fa = fb
   }
   return null
 }
