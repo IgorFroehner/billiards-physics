@@ -103,6 +103,9 @@ interface Path {
   cx: number
   cy: number
   until: number
+  /** |b| and |a|: how fast it starts and how fast it slows, for `reach`. */
+  speed: number
+  accel: number
 }
 
 /** Going somewhere: a ball that only spins in place isn't. */
@@ -122,6 +125,8 @@ function path(table: BallsAndCloth, b: Ball): Path {
     const u = Math.hypot(ux, uy)
     const k = (table.slide * G) / 2
     return {
+      speed: Math.sqrt(b.vx * b.vx + b.vy * b.vy),
+      accel: k,
       ax: (-k * ux) / u,
       ay: (-k * uy) / u,
       bx: b.vx,
@@ -135,6 +140,8 @@ function path(table: BallsAndCloth, b: Ball): Path {
     const v = Math.hypot(b.vx, b.vy)
     const k = (table.roll * G) / 2
     return {
+      speed: v,
+      accel: k,
       ax: (-k * b.vx) / v,
       ay: (-k * b.vy) / v,
       bx: b.vx,
@@ -145,7 +152,7 @@ function path(table: BallsAndCloth, b: Ball): Path {
     }
   }
   const until = b.motion === "spinning" ? Math.abs(b.wz) / spinDecay(table) : Infinity
-  return { ax: 0, ay: 0, bx: 0, by: 0, cx: b.x, cy: b.y, until }
+  return { ax: 0, ay: 0, bx: 0, by: 0, cx: b.x, cy: b.y, until, speed: 0, accel: 0 }
 }
 
 /**
@@ -307,11 +314,29 @@ function linePoly(p: Path, line: Cushion, d: number): Poly {
   ]
 }
 
-const still = (p: Point): Path => ({ ax: 0, ay: 0, bx: 0, by: 0, cx: p.x, cy: p.y, until: Infinity })
+const still = (p: Point): Path => ({
+  ax: 0,
+  ay: 0,
+  bx: 0,
+  by: 0,
+  cx: p.x,
+  cy: p.y,
+  until: Infinity,
+  speed: 0,
+  accel: 0,
+})
 
 /** How far a path can get from where it starts within `t`. */
 function reach(p: Path, t: number): number {
-  return Math.hypot(p.bx, p.by) * t + Math.hypot(p.ax, p.ay) * t * t
+  return p.speed * t + p.accel * t * t
+}
+
+/** Whether `p`, `d` or nearer to (x, y), could get there within `t`: if not, there's no touch to look for. */
+function within(p: Path, x: number, y: number, d: number, t: number): boolean {
+  const dx = p.cx - x
+  const dy = p.cy - y
+  const near = d + reach(p, t)
+  return dx * dx + dy * dy <= near * near
 }
 
 function positionAt(p: Path, t: number): Point {
@@ -339,6 +364,78 @@ function outLines(table: TableSpec): Cushion[] {
   ]
 }
 
+/**
+ * When balls `a` and `b` first touch, if before `soonest` (seconds from now) and before either changes how it moves.
+ * Two balls that both stay in place never do.
+ */
+function pairTouch(R: number, a: Ball, b: Ball, pa: Path, pb: Path, soonest: number): number | null {
+  if (a.motion === "pocketed" || b.motion === "pocketed" || (!moving(a) && !moving(b))) return null
+  const hi = Math.min(pa.until, pb.until, soonest)
+  if (!within(pa, pb.cx, pb.cy, 2 * R + reach(pb, hi), hi)) return null
+  const t = firstTouch(distancePoly(pa, pb, 2 * R), hi)
+  return t !== null && t < soonest ? t : null
+}
+
+/**
+ * The first part of the table a moving ball reaches, if before `soonest` (seconds from now) and before it changes how
+ * it moves: a cushion, a jaw, a pocket, or the line past a pocket's mouth.
+ */
+function tableTouch(table: TableSpec, outs: readonly Cushion[], b: Ball, p: Path, soonest: number): Next | null {
+  const R = table.ballRadius
+  let best: Next | null = null
+  for (const c of table.cushions) {
+    const hi = Math.min(p.until, soonest)
+    const poly = linePoly(p, c, R)
+    if ((poly[0] as number) > reach(p, hi)) continue
+    const t = firstTouch(poly, hi)
+    if (t === null || t >= soonest) continue
+    // Only where the cushion is: past its ends, the jaws and the pocket take over.
+    const hit = positionAt(p, t)
+    const dx = c.to.x - c.from.x
+    const dy = c.to.y - c.from.y
+    const s = ((hit.x - c.from.x) * dx + (hit.y - c.from.y) * dy) / (dx * dx + dy * dy)
+    if (s >= 0 && s <= 1) {
+      best = { dt: t, type: "cushion", ball: b.id, nx: c.nx, ny: c.ny }
+      soonest = t
+    }
+  }
+  for (let k = 0; k < table.jaws.length; k++) {
+    const jaw = table.jaws[k] as Point
+    const hi = Math.min(p.until, soonest)
+    if (!within(p, jaw.x, jaw.y, R + table.jawRadius, hi)) continue
+    const t = firstTouch(distancePoly(p, still(jaw), R + table.jawRadius), hi)
+    if (t !== null && t < soonest) {
+      best = { dt: t, type: "jaw", ball: b.id, jaw: k }
+      soonest = t
+    }
+  }
+  for (let k = 0; k < table.pockets.length; k++) {
+    const hole = table.pockets[k] as Point
+    const hi = Math.min(p.until, soonest)
+    if (!within(p, hole.x, hole.y, table.holeRadius, hi)) continue
+    const t = firstTouch(distancePoly(p, still(hole), table.holeRadius), hi)
+    if (t !== null && t < soonest) {
+      best = { dt: t, type: "pocket", ball: b.id, pocket: k }
+      soonest = t
+    }
+  }
+  for (const line of outs) {
+    const hi = Math.min(p.until, soonest)
+    const poly = linePoly(p, line, 0)
+    if ((poly[0] as number) > reach(p, hi)) continue
+    const t = firstTouch(poly, hi)
+    if (t !== null && t < soonest) {
+      best = { dt: t, type: "pocket", ball: b.id, pocket: nearestPocket(table, positionAt(p, t)) }
+      soonest = t
+    }
+  }
+  return best
+}
+
+/**
+ * The soonest event on the table. Each check only looks up to the soonest found so far, and ties go to what's checked
+ * first: a ball changing how it moves, then two balls touching, then a ball and the table.
+ */
 function nextEvent(
   table: TableSpec,
   outs: readonly Cushion[],
@@ -347,59 +444,33 @@ function nextEvent(
 ): Next | null {
   const R = table.ballRadius
   let best: Next | null = null
-  const soonest = () => best?.dt ?? Infinity
+  let soonest = Infinity
 
-  for (const b of balls) {
-    const until = (paths[b.id] as Path).until
-    if (until < soonest()) best = { dt: until, type: "change", ball: b.id }
+  for (let i = 0; i < balls.length; i++) {
+    const until = (paths[i] as Path).until
+    if (until < soonest) {
+      best = { dt: until, type: "change", ball: i }
+      soonest = until
+    }
   }
 
   for (let i = 0; i < balls.length; i++) {
-    const a = balls[i] as Ball
-    if (a.motion === "pocketed") continue
-    const pa = paths[i] as Path
     for (let j = i + 1; j < balls.length; j++) {
-      const b = balls[j] as Ball
-      if (b.motion === "pocketed" || (!moving(a) && !moving(b))) continue
-      const pb = paths[j] as Path
-      const hi = Math.min(pa.until, pb.until, soonest())
-      if (Math.hypot(a.x - b.x, a.y - b.y) - 2 * R > reach(pa, hi) + reach(pb, hi)) continue
-      const t = firstTouch(distancePoly(pa, pb, 2 * R), hi)
-      if (t !== null && t < soonest()) best = { dt: t, type: "ball", ball: i, other: j }
+      const t = pairTouch(R, balls[i] as Ball, balls[j] as Ball, paths[i] as Path, paths[j] as Path, soonest)
+      if (t !== null) {
+        best = { dt: t, type: "ball", ball: i, other: j }
+        soonest = t
+      }
     }
   }
 
-  for (const b of balls) {
+  for (let i = 0; i < balls.length; i++) {
+    const b = balls[i] as Ball
     if (!moving(b)) continue
-    const p = paths[b.id] as Path
-    for (const c of table.cushions) {
-      const hi = Math.min(p.until, soonest())
-      const t = firstTouch(linePoly(p, c, R), hi)
-      if (t === null || t >= soonest()) continue
-      // Only where the cushion is: past its ends, the jaws and the pocket take over.
-      const hit = positionAt(p, t)
-      const dx = c.to.x - c.from.x
-      const dy = c.to.y - c.from.y
-      const s = ((hit.x - c.from.x) * dx + (hit.y - c.from.y) * dy) / (dx * dx + dy * dy)
-      if (s >= 0 && s <= 1) best = { dt: t, type: "cushion", ball: b.id, nx: c.nx, ny: c.ny }
-    }
-    table.jaws.forEach((jaw, k) => {
-      const hi = Math.min(p.until, soonest())
-      if (Math.hypot(b.x - jaw.x, b.y - jaw.y) - R - table.jawRadius > reach(p, hi)) return
-      const t = firstTouch(distancePoly(p, still(jaw), R + table.jawRadius), hi)
-      if (t !== null && t < soonest()) best = { dt: t, type: "jaw", ball: b.id, jaw: k }
-    })
-    table.pockets.forEach((hole, k) => {
-      const hi = Math.min(p.until, soonest())
-      if (Math.hypot(b.x - hole.x, b.y - hole.y) - table.holeRadius > reach(p, hi)) return
-      const t = firstTouch(distancePoly(p, still(hole), table.holeRadius), hi)
-      if (t !== null && t < soonest()) best = { dt: t, type: "pocket", ball: b.id, pocket: k }
-    })
-    for (const line of outs) {
-      const hi = Math.min(p.until, soonest())
-      const t = firstTouch(linePoly(p, line, 0), hi)
-      if (t !== null && t < soonest())
-        best = { dt: t, type: "pocket", ball: b.id, pocket: nearestPocket(table, positionAt(p, t)) }
+    const hit = tableTouch(table, outs, b, paths[i] as Path, soonest)
+    if (hit) {
+      best = hit
+      soonest = hit.dt
     }
   }
   return best
@@ -712,10 +783,15 @@ export function run(table: TableSpec, start: readonly Ball[], options: RunOption
   }
 
   const settled = !balls.some(moving)
-  // What still spins in place stops, and so does whatever still moves past the event limit.
-  balls = balls.map((b) =>
-    moving(b) || b.motion === "spinning" ? { ...b, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, motion: "still" as const } : b,
-  )
+  // What still spins in place stops, and so does whatever still moves past the event limit. The track keeps the spin
+  // wearing away in place, which ends where the run does, but a ball stopped in its tracks needs a state saying so, or
+  // the playback would carry it on.
+  balls = balls.map((b, id) => {
+    if (!moving(b) && b.motion !== "spinning") return b
+    const stopped: Ball = { ...b, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, motion: "still" }
+    if (moving(b)) keys[id]?.push(toKeyframe(time, stopped))
+    return stopped
+  })
   const contacts = events.map((e): Contact => [e.t, e.type, e.speed])
   return { balls, track: { duration: time, keys, contacts }, events, pocketed, settled }
 }
