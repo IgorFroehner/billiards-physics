@@ -250,8 +250,8 @@ function roots(c: Poly, lo: number, hi: number): number[] {
   for (let i = 0; i <= between.length; i++) {
     const b = i < between.length ? (between[i] as number) : hi
     const fb = at(c, b)
-    if (fa > 0 && fb < 0) out.push(cross(c, a, b, 1))
-    else if (fa < 0 && fb > 0) out.push(cross(c, a, b, -1))
+    if (fa > 0 && fb < 0) out.push(cross(c, 1, a, fa, b, fb))
+    else if (fa < 0 && fb > 0) out.push(cross(c, -1, a, fa, b, fb))
     a = b
     fa = fb
   }
@@ -259,16 +259,35 @@ function roots(c: Poly, lo: number, hi: number): number[] {
 }
 
 /**
- * Where `sign · c` goes from above zero (at `a`) to zero or below (at `b`). Returns the first time at or below zero.
- * With `sign` -1, it's where `c` comes up from below.
+ * Where `sign · c` goes from above zero (at `a`, where `c` is `fa`) to zero or below (at `b`, where it's `fb`).
+ * Returns the first time at or below zero. With `sign` -1, it's where `c` comes up from below.
+ *
+ * By the Illinois method: each step cuts where the straight line between the two ends meets zero, and an end that
+ * stays put twice in a row has its value halved, so both ends close in. The two ends always keep the zero between
+ * them, so what comes back is never before it.
  */
-function cross(c: Poly, a: number, b: number, sign: 1 | -1): number {
+function cross(c: Poly, sign: 1 | -1, a: number, fa: number, b: number, fb: number): number {
   let lo = a
   let hi = b
+  let flo = sign * fa
+  let fhi = sign * fb
+  /** Which end the last step moved: 1 for `lo`, -1 for `hi`. */
+  let moved = 0
   for (let i = 0; i < 80 && hi - lo > 1e-13; i++) {
-    const mid = (lo + hi) / 2
-    if (sign * at(c, mid) > 0) lo = mid
-    else hi = mid
+    let mid = hi - (fhi * (hi - lo)) / (fhi - flo)
+    if (!(mid > lo && mid < hi)) mid = (lo + hi) / 2
+    const f = sign * at(c, mid)
+    if (f > 0) {
+      lo = mid
+      flo = f
+      if (moved === 1) fhi /= 2
+      moved = 1
+    } else {
+      hi = mid
+      fhi = f
+      if (moved === -1) flo /= 2
+      moved = -1
+    }
   }
   return hi
 }
@@ -287,7 +306,7 @@ function firstTouch(c: Poly, hi: number): number | null {
     const fb = at(c, b)
     if (fa <= 0) {
       if (fb < fa) return a
-    } else if (fb <= 0) return cross(c, a, b, 1)
+    } else if (fb <= 0) return cross(c, 1, a, fa, b, fb)
     a = b
     fa = fb
   }
