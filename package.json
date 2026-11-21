@@ -37,6 +37,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "vitest run",
+    "bench": "vitest bench --reporter=verbose",
     "typecheck": "tsc -p .",
     "lint": "oxlint src",
     "format": "prettier --write .",
